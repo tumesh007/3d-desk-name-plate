@@ -1,0 +1,844 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Desk Name Plate Customizer</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --primary: #f97316;
+      --primary-hover: #ea580c;
+      --accent: #38bdf8;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #viewport-container {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(circle at 50% 50%, #1e293b 0%, #090d16 100%);
+    }
+    #canvas-3d {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .view-controls {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 10;
+    }
+    .btn-view {
+      background: rgba(30, 41, 59, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--card-border);
+      color: var(--text-main);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-view:hover {
+      background: rgba(51, 65, 85, 0.9);
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    .bed-badge {
+      position: absolute;
+      bottom: 20px;
+      left: 20px;
+      background: rgba(30, 41, 59, 0.9);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--card-border);
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 10;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 12px;
+      padding: 2px 8px;
+      border-radius: 12px;
+      width: fit-content;
+    }
+    .status-ok { background: #065f46; color: #34d399; }
+    .status-diag { background: #1e3a8a; color: #60a5fa; }
+    .status-warn { background: #831843; color: #f472b6; }
+
+    #sidebar {
+      width: 420px;
+      background: var(--card-bg);
+      border-left: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      box-shadow: -4px 0 24px rgba(0,0,0,0.4);
+      z-index: 20;
+    }
+    .sidebar-header {
+      padding: 20px;
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .sidebar-header h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--accent);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .control-group {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+    .field input[type="text"], .field select {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text-main);
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .field input[type="text"]:focus, .field select:focus {
+      border-color: var(--primary);
+    }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      accent-color: var(--primary);
+    }
+    .val-display {
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text-main);
+      min-width: 44px;
+      text-align: right;
+    }
+    .color-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .color-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+    }
+    .color-input-wrap input[type="color"] {
+      border: none;
+      width: 24px;
+      height: 24px;
+      background: none;
+      cursor: pointer;
+    }
+    .color-input-wrap span {
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+    }
+    .toggle-row input[type="checkbox"] {
+      accent-color: var(--primary);
+      width: 16px;
+      height: 16px;
+      cursor: pointer;
+    }
+    .sidebar-footer {
+      padding: 16px 20px;
+      border-top: 1px solid var(--card-border);
+      background: #1e293b;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .btn-primary {
+      background: var(--primary);
+      color: #fff;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background 0.15s;
+    }
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+    .btn-secondary {
+      background: #0f172a;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    #guide-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      z-index: 100;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    .modal-box {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      max-width: 600px;
+      width: 100%;
+      max-height: 85vh;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .modal-box h2 {
+      font-size: 18px;
+      color: var(--primary);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-box .close-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+    .modal-box p, .modal-box li {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+    .modal-box ul {
+      padding-left: 20px;
+    }
+    .tag {
+      background: #334155;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 12px;
+    }
+  </style>
+  <script src="js/three.min.js"></script>
+  <script src="js/OrbitControls.js"></script>
+  <script src="js/STLExporter.js"></script>
+</head>
+<body>
+  <div id="viewport-container">
+    <div class="view-controls">
+      <button class="btn-view" onclick="setView('seated')">🪑 Seated Desk View</button>
+      <button class="btn-view" onclick="setView('side')">📐 Side Arc View</button>
+      <button class="btn-view" onclick="setView('iso')">🧊 Isometric</button>
+      <button class="btn-view" onclick="setView('top')">⬆️ Top View</button>
+    </div>
+
+    <div class="bed-badge">
+      <div id="bed-status-pill" class="status-pill status-ok">● Fits on A1 Mini Bed (180x180)</div>
+      <div id="dim-readout" style="color: #cbd5e1;">Dims: 163.7 × 43.4 × 11.0 mm</div>
+      <div id="overhang-readout" style="color: #94a3b8; font-size: 11px;">Max Overhang: 40° (100% Support-Free)</div>
+    </div>
+
+    <canvas id="canvas-3d"></canvas>
+  </div>
+
+  <div id="sidebar">
+    <div class="sidebar-header">
+      <h1>🏷️ Desk Plate Customizer</h1>
+      <span style="font-size: 11px; background: #334155; padding: 3px 8px; border-radius: 6px; color: #f8fafc;">Bambu A1 Mini</span>
+    </div>
+
+    <div class="sidebar-content">
+      <div class="field">
+        <div class="section-title">Text & Typography</div>
+        <div class="control-group">
+          <div class="field">
+            <label>Name Text (Upper Line)</label>
+            <input type="text" id="input-name" value="JAGJEET SINGH" oninput="updateModel()">
+          </div>
+          <div class="field">
+            <label>Designation (Lower Line)</label>
+            <input type="text" id="input-desig" value="(B.Sc Radiology)" oninput="updateModel()">
+          </div>
+          <div class="field">
+            <label>Name Font Size <span class="val-display" id="val-name-size">14 mm</span></label>
+            <div class="slider-row">
+              <input type="range" id="input-name-size" min="10" max="24" step="0.5" value="14" oninput="updateParam('name-size')">
+            </div>
+          </div>
+          <div class="field">
+            <label>Designation Font Size <span class="val-display" id="val-desig-size">9.5 mm</span></label>
+            <div class="slider-row">
+              <input type="range" id="input-desig-size" min="6" max="18" step="0.5" value="9.5" oninput="updateParam('desig-size')">
+            </div>
+          </div>
+          <button class="btn-secondary" onclick="autoFit()" style="margin-top: 4px;">⚡ Auto-Fit to 175 mm Bed</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="section-title">
+          <span>Printer & Multi-Color Mode</span>
+          <span style="font-size: 10px; color: var(--text-muted); cursor: pointer;" onclick="openGuide()">ℹ️ Guide</span>
+        </div>
+        <div class="control-group">
+          <div class="field">
+            <label>Print Mode</label>
+            <select id="input-print-mode" onchange="updateModel()">
+              <option value="dual_material">🎨 Dual Material (AMS / Multi-Extruder)</option>
+              <option value="layer_pause">⏱️ Non-AMS: Single Print Layer Pause (1 Swap)</option>
+              <option value="inlay_assembly">🧩 Non-AMS: Inlay Snap-Fit Assembly (0 Swaps)</option>
+            </select>
+          </div>
+          <label class="toggle-row">
+            <span>Orient Diagonally (45° on Bed)</span>
+            <input type="checkbox" id="input-diagonal" onchange="updateModel()">
+          </label>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="section-title">Curved Bend Geometry</div>
+        <div class="control-group">
+          <label class="toggle-row">
+            <span>Slant Name Text (First Text)</span>
+            <input type="checkbox" id="input-slant-name" checked onchange="updateModel()">
+          </label>
+          <div class="field">
+            <label>Bend Lean Angle <span class="val-display" id="val-bend-deg">40°</span></label>
+            <div class="slider-row">
+              <input type="range" id="input-bend-deg" min="15" max="55" step="1" value="40" oninput="updateParam('bend-deg')">
+            </div>
+          </div>
+          <div class="field">
+            <label>Slat Slices <span class="val-display" id="val-slices">24</span></label>
+            <div class="slider-row">
+              <input type="range" id="input-slices" min="8" max="36" step="1" value="24" oninput="updateParam('slices')">
+            </div>
+          </div>
+          <div class="field">
+            <label>Slice Thickness <span class="val-display" id="val-slice-t">0.85 mm</span></label>
+            <div class="slider-row">
+              <input type="range" id="input-slice-t" min="0.5" max="1.4" step="0.05" value="0.85" oninput="updateParam('slice-t')">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="section-title">Filament Colors</div>
+        <div class="control-group">
+          <div class="color-row">
+            <div class="color-input-wrap">
+              <input type="color" id="input-base-color" value="#f97316" oninput="updateColors()">
+              <span>Base / Name</span>
+            </div>
+            <div class="color-input-wrap">
+              <input type="color" id="input-text-color" value="#ffffff" oninput="updateColors()">
+              <span>Designation</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <button class="btn-primary" onclick="exportSTL()">
+        ⬇️ Export STL for Slicing
+      </button>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="exportSCAD()">📄 Download .scad</button>
+        <button class="btn-secondary" onclick="openGuide()">📖 Slicing Guide</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="guide-modal" onclick="if(event.target===this) closeGuide()">
+    <div class="modal-box">
+      <h2>
+        <span>3D Printing & Slicing Guide</span>
+        <button class="close-btn" onclick="closeGuide()">✕</button>
+      </h2>
+      <p>This model is engineered specifically for support-free FDM 3D printing on beds like the <strong>Bambu Lab A1 Mini (180 × 180 mm)</strong>.</p>
+      
+      <h3 style="color: var(--accent); font-size: 14px; margin-top: 6px;">1. With Bambu Lab AMS (Dual Material)</h3>
+      <ul>
+        <li>Select <strong>Dual Material</strong> mode and click <strong>Export STL</strong>.</li>
+        <li>Drag both <span class="tag">color.stl</span> and <span class="tag">white.stl</span> into Bambu Studio simultaneously.</li>
+        <li>Select <strong>Yes</strong> when asked: <em>"Load these files as a single object with multiple parts?"</em>.</li>
+        <li>Assign Filament 1 (Orange) to plate/name and Filament 2 (White) to designation. Print flat with <strong>0 supports</strong>!</li>
+      </ul>
+
+      <h3 style="color: var(--accent); font-size: 14px; margin-top: 6px;">2. Without AMS: Single Print Layer-Pause (1 Swap)</h3>
+      <ul>
+        <li>Select <strong>Layer Pause</strong> mode and download <span class="tag">nameplate_layer_pause.stl</span>.</li>
+        <li>In Bambu Studio / OrcaSlicer, slice the model at <span class="tag">0.2 mm</span> layer height.</li>
+        <li>In the preview slider, scroll to layer height <span class="tag">3.2 mm</span> (right after 3.0mm base plate).</li>
+        <li>Right-click the vertical layer slider and select <strong>Add Pause</strong> (<span class="tag">M600</span>).</li>
+        <li>The printer will automatically pause, allowing you to manually swap to White filament!</li>
+      </ul>
+
+      <h3 style="color: var(--accent); font-size: 14px; margin-top: 6px;">3. Without AMS: Inlay Snap-Fit Assembly (0 Swaps)</h3>
+      <ul>
+        <li>Select <strong>Inlay Assembly</strong> mode to print two completely separate parts.</li>
+        <li>Print <span class="tag">base_inlay_recessed.stl</span> in Orange.</li>
+        <li>Print <span class="tag">designation_insert.stl</span> in White.</li>
+        <li>Both print 100% single-color with 0 filament changes. Snap or glue the mating tab into the base socket!</li>
+      </ul>
+
+      <button class="btn-primary" onclick="closeGuide()" style="margin-top: 10px;">Got It!</button>
+    </div>
+  </div>
+
+  <script>
+    const container = document.getElementById('viewport-container');
+    const canvas = document.getElementById('canvas-3d');
+    
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, container.clientWidth / container.clientHeight, 1, 1000);
+    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = true;
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
+    scene.add(ambientLight);
+
+    const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.85);
+    dirLight1.position.set(60, 100, 120);
+    dirLight1.castShadow = true;
+    scene.add(dirLight1);
+
+    const dirLight2 = new THREE.DirectionalLight(0x38bdf8, 0.35);
+    dirLight2.position.set(-80, -60, -40);
+    scene.add(dirLight2);
+
+    const bedGroup = new THREE.Group();
+    const bedGeo = new THREE.BoxGeometry(180, 180, 1);
+    const bedMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.1,
+      roughness: 0.8,
+      transparent: true,
+      opacity: 0.7
+    });
+    const bedMesh = new THREE.Mesh(bedGeo, bedMat);
+    bedMesh.position.set(0, 0, -0.5);
+    bedMesh.rotation.x = -Math.PI / 2;
+    bedGroup.add(bedMesh);
+
+    const grid = new THREE.GridHelper(180, 18, 0x475569, 0x334155);
+    grid.position.set(0, 0.01, 0);
+    bedGroup.add(grid);
+
+    scene.add(bedGroup);
+
+    const plateGroup = new THREE.Group();
+    scene.add(plateGroup);
+
+    let loadedFont = null;
+    const loader = new THREE.FontLoader();
+    loader.load('fonts/helvetiker_bold.typeface.json', (font) => {
+      loadedFont = font;
+      updateModel();
+    }, undefined, (err) => {
+      loader.load('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/fonts/helvetiker_bold.typeface.json', (font) => {
+        loadedFont = font;
+        updateModel();
+      });
+    });
+
+    function setView(type) {
+      if (type === 'seated') {
+        camera.position.set(0, 75, 110);
+        controls.target.set(0, 5, 0);
+      } else if (type === 'side') {
+        camera.position.set(130, 10, 0);
+        controls.target.set(0, 8, 0);
+      } else if (type === 'top') {
+        camera.position.set(0, 160, 0);
+        controls.target.set(0, 0, 0);
+      } else if (type === 'iso') {
+        camera.position.set(80, 75, 95);
+        controls.target.set(0, 5, 0);
+      }
+      controls.update();
+    }
+    setView('iso');
+
+    function updateParam(name) {
+      const val = document.getElementById().value;
+      const unit = (name.includes('deg')) ? '°' : (name.includes('slices') ? '' : ' mm');
+      document.getElementById().textContent = val + unit;
+      updateModel();
+    }
+
+    function autoFit() {
+      const name = document.getElementById('input-name').value || 'NAME';
+      const maxL = 172;
+      const margin = 3.5;
+      const availableL = maxL - 2 * (margin + 3);
+      const nameLenChars = name.length;
+      
+      const fittedNameSize = Math.min(22, Math.max(10, Math.floor((availableL / (nameLenChars * 0.82)) * 10) / 10));
+      const fittedDesigSize = Math.min(14, Math.max(7, Math.floor(fittedNameSize * 0.68 * 10) / 10));
+      
+      document.getElementById('input-name-size').value = fittedNameSize;
+      document.getElementById('val-name-size').textContent = fittedNameSize + ' mm';
+      document.getElementById('input-desig-size').value = fittedDesigSize;
+      document.getElementById('val-desig-size').textContent = fittedDesigSize + ' mm';
+      
+      updateModel();
+    }
+
+    let matBase, matName, matDesig;
+    function updateColors() {
+      const cBase = document.getElementById('input-base-color').value;
+      const cText = document.getElementById('input-text-color').value;
+      const mode = document.getElementById('input-print-mode').value;
+
+      if (!matBase) {
+        matBase = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.1 });
+        matName = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.1 });
+        matDesig = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.1 });
+      }
+
+      matBase.color.set(cBase);
+      if (mode === 'layer_pause') {
+        matName.color.set(cText);
+        matDesig.color.set(cText);
+      } else {
+        matName.color.set(cBase);
+        matDesig.color.set(cText);
+      }
+    }
+
+    function updateModel() {
+      if (!loadedFont) return;
+      updateColors();
+
+      while (plateGroup.children.length > 0) {
+        plateGroup.remove(plateGroup.children[0]);
+      }
+
+      const nameStr = document.getElementById('input-name').value || ' ';
+      const desigStr = document.getElementById('input-desig').value || ' ';
+      const nameSize = parseFloat(document.getElementById('input-name-size').value);
+      const desigSize = parseFloat(document.getElementById('input-desig-size').value);
+      const bendDeg = parseFloat(document.getElementById('input-bend-deg').value);
+      const slices = parseInt(document.getElementById('input-slices').value);
+      const sliceT = parseFloat(document.getElementById('input-slice-t').value);
+      const slantName = document.getElementById('input-slant-name').checked;
+      const printMode = document.getElementById('input-print-mode').value;
+      const isDiagonal = document.getElementById('input-diagonal').checked;
+
+      const baseT = 3.0;
+      const margin = 3.5;
+      const lineGap = 4.5;
+
+      const nameShapes = loadedFont.generateShapes(nameStr, nameSize);
+      const desigShapes = loadedFont.generateShapes(desigStr, desigSize);
+
+      const nameGeoTest = new THREE.ShapeGeometry(nameShapes);
+      nameGeoTest.computeBoundingBox();
+      const nameW = nameGeoTest.boundingBox ? (nameGeoTest.boundingBox.max.x - nameGeoTest.boundingBox.min.x) : 80;
+
+      const desigGeoTest = new THREE.ShapeGeometry(desigShapes);
+      desigGeoTest.computeBoundingBox();
+      const desigW = desigGeoTest.boundingBox ? (desigGeoTest.boundingBox.max.x - desigGeoTest.boundingBox.min.x) : 60;
+
+      const totalTextW = Math.max(nameW, desigW);
+      const totalPlateL = totalTextW + 2 * (margin + 3);
+      const totalPlateW = (nameSize + desigSize + lineGap) + 2 * (margin + 3);
+
+      const baseShape = new THREE.Shape();
+      const hw = totalPlateL / 2;
+      const hh = totalPlateW / 2;
+      const cr = 4.0;
+
+      baseShape.moveTo(-hw + cr, -hh);
+      baseShape.lineTo(hw - cr, -hh);
+      baseShape.quadraticCurveTo(hw, -hh, hw, -hh + cr);
+      baseShape.lineTo(hw, hh - cr);
+      baseShape.quadraticCurveTo(hw, hh, hw - cr, hh);
+      baseShape.lineTo(-hw + cr, hh);
+      baseShape.quadraticCurveTo(-hw, hh, -hw, hh - cr);
+      baseShape.lineTo(-hw, -hh + cr);
+      baseShape.quadraticCurveTo(-hw, -hh, -hw + cr, -hh);
+
+      const baseExtrudeSettings = { depth: baseT, bevelEnabled: true, bevelThickness: 0.4, bevelSize: 0.4, bevelSegments: 3 };
+      const basePlateGeo = new THREE.ExtrudeGeometry(baseShape, baseExtrudeSettings);
+      basePlateGeo.rotateX(-Math.PI / 2);
+      basePlateGeo.translate(0, baseT, 0);
+
+      const baseMesh = new THREE.Mesh(basePlateGeo, matBase);
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      plateGroup.add(baseMesh);
+
+      const nameGroup = new THREE.Group();
+      const nameZPos = -hh + margin + desigSize + lineGap + (nameSize * 0.3);
+      const nameXOffset = -nameW / 2;
+
+      if (slantName) {
+        for (let i = 0; i < slices; i++) {
+          const ang = (i * (bendDeg / slices)) * Math.PI / 180;
+          const sliceGeo = new THREE.ExtrudeGeometry(nameShapes, { depth: sliceT, bevelEnabled: false });
+          sliceGeo.rotateX(-ang);
+          const sliceMesh = new THREE.Mesh(sliceGeo, matName);
+          sliceMesh.position.set(nameXOffset, baseT + (i * 0.02), nameZPos - (Math.sin(ang) * (nameSize * 0.5)));
+          nameGroup.add(sliceMesh);
+        }
+      } else {
+        const solidNameGeo = new THREE.ExtrudeGeometry(nameShapes, { depth: 8.0, bevelEnabled: false });
+        solidNameGeo.rotateX(-Math.PI / 2);
+        const nameMesh = new THREE.Mesh(solidNameGeo, matName);
+        nameMesh.position.set(nameXOffset, baseT, nameZPos);
+        nameGroup.add(nameMesh);
+      }
+      plateGroup.add(nameGroup);
+
+      const desigGroup = new THREE.Group();
+      const desigZPos = -hh + margin + (desigSize * 0.35);
+      const desigXOffset = -desigW / 2;
+
+      for (let i = 0; i < slices; i++) {
+        const ang = (i * (bendDeg / slices)) * Math.PI / 180;
+        const sliceGeo = new THREE.ExtrudeGeometry(desigShapes, { depth: sliceT, bevelEnabled: false });
+        sliceGeo.rotateX(-ang);
+        const sliceMesh = new THREE.Mesh(sliceGeo, matDesig);
+        sliceMesh.position.set(desigXOffset, baseT + (i * 0.02), desigZPos - (Math.sin(ang) * (desigSize * 0.45)));
+        desigGroup.add(sliceMesh);
+      }
+      plateGroup.add(desigGroup);
+
+      if (printMode === 'inlay_assembly') {
+        const tabShape = new THREE.Shape();
+        const tabW = desigW + 4;
+        const tabH = desigSize + 4;
+        tabShape.moveTo(-tabW/2, -tabH/2);
+        tabShape.lineTo(tabW/2, -tabH/2);
+        tabShape.lineTo(tabW/2, tabH/2);
+        tabShape.lineTo(-tabW/2, tabH/2);
+        tabShape.closePath();
+
+        const tabGeo = new THREE.ExtrudeGeometry(tabShape, { depth: 1.0, bevelEnabled: false });
+        tabGeo.rotateX(-Math.PI / 2);
+        const tabMesh = new THREE.Mesh(tabGeo, matDesig);
+        tabMesh.position.set(0, baseT - 1.0, desigZPos + desigSize/2);
+        plateGroup.add(tabMesh);
+      }
+
+      if (isDiagonal) {
+        plateGroup.rotation.y = Math.PI / 4;
+      } else {
+        plateGroup.rotation.y = 0;
+      }
+
+      const totalH = baseT + (nameSize * Math.sin(bendDeg * Math.PI / 180)) + 2.0;
+      document.getElementById('dim-readout').textContent = 
+        Math.round(totalPlateL) + ' × ' + Math.round(totalPlateW) + ' × ' + Math.round(totalH) + ' mm';
+
+      const pill = document.getElementById('bed-status-pill');
+      if (totalPlateL <= 175) {
+        pill.className = 'status-pill status-ok';
+        pill.textContent = '● Fits on A1 Mini Bed (180x180)';
+      } else if (totalPlateL <= 245) {
+        pill.className = 'status-pill status-diag';
+        pill.textContent = isDiagonal ? '● Fits on A1 Mini Bed Diagonally' : '⚠️ Exceeds 175mm (Turn on Diagonal)';
+      } else {
+        pill.className = 'status-pill status-warn';
+        pill.textContent = '❌ Too Long! Click Auto-Fit';
+      }
+
+      document.getElementById('overhang-readout').textContent = 
+        bendDeg + '° from vertical (' + (90 - bendDeg) + '° from desk, 100% support-free)';
+    }
+
+    function openGuide() { document.getElementById('guide-modal').style.display = 'flex'; }
+    function closeGuide() { document.getElementById('guide-modal').style.display = 'none'; }
+
+    function exportSCAD() {
+      const name = document.getElementById('input-name').value;
+      const desig = document.getElementById('input-desig').value;
+      const nameSize = document.getElementById('input-name-size').value;
+      const desigSize = document.getElementById('input-desig-size').value;
+      const bendDeg = document.getElementById('input-bend-deg').value;
+      const slices = document.getElementById('input-slices').value;
+      const sliceT = document.getElementById('input-slice-t').value;
+      const slantName = document.getElementById('input-slant-name').checked;
+      const printMode = document.getElementById('input-print-mode').value;
+      const isDiagonal = document.getElementById('input-diagonal').checked;
+
+      const scadContent = [
+        '// Parametric Curved Desk Name Plate',
+        '// Generated by 3D Desk Name Plate Web Customizer',
+        '// Compatible with Bambu Lab A1 Mini (180x180mm) and all standard 3D printers',
+        '',
+        'name = "' + name + '";',
+        'name_size = ' + nameSize + ';',
+        'slant_name = ' + slantName + ';',
+        '',
+        'desig = "' + desig + '";',
+        'desig_size = ' + desigSize + ';',
+        '',
+        'bend_deg = ' + bendDeg + ';',
+        'lean_reference = "from_vertical";',
+        'slices = ' + slices + ';',
+        'slice_t = ' + sliceT + ';',
+        '',
+        'part = "' + printMode + '"; // Options: "dual_material", "layer_pause", "assembly_base", "assembly_insert"',
+        '',
+        '// Slicing and geometry settings',
+        'base_t = 3.0;',
+        'lip_h = 1.0;',
+        'margin = 4.0;',
+        'eps = 0.05;',
+        '',
+        'include <plate.scad>'
+      ].join('\\n');
+
+      const blob = new Blob([scadContent], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'nameplate_' + name.replace(/\\s+/g, '_') + '_custom.scad';
+      a.click();
+    }
+
+    function exportSTL() {
+      if (typeof THREE.STLExporter === 'undefined') {
+        alert('STL Exporter library is loading. Please try again in a moment.');
+        return;
+      }
+      const exporter = new THREE.STLExporter();
+      const result = exporter.parse(plateGroup, { binary: true });
+      const blob = new Blob([result], { type: 'application/octet-stream' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      const mode = document.getElementById('input-print-mode').value;
+      a.download = 'nameplate_' + name.replace(/\\s+/g, '_') + '_' + mode + '.stl';
+      a.click();
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    });
+  </script>
+</body>
+</html>

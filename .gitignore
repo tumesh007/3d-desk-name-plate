@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Scratch scripts & temporary tests
+test*
+measure*
+check_*.py
+render_*.py
+compare_*.py
+export_stls.py
+*.log
+
+# Root scratch images & STLs (clean copies are in docs/images and stls/)
+/*.png
+/*.stl
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
