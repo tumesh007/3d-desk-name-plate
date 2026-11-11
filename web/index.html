@@ -556,32 +556,42 @@
     });
 
     function setView(type) {
-      if (type === 'seated') {
-        camera.position.set(0, 75, 110);
-        controls.target.set(0, 5, 0);
-      } else if (type === 'side') {
-        camera.position.set(130, 10, 0);
+      if (type === "seated") {
+        // Seated desk perspective: directly facing the plate from chair level
+        camera.position.set(0, 55, 215);
         controls.target.set(0, 8, 0);
-      } else if (type === 'top') {
-        camera.position.set(0, 160, 0);
+      } else if (type === "side") {
+        // Side view looking straight along X-axis to clearly inspect the 40 deg curved profile
+        camera.position.set(210, 16, 0);
+        controls.target.set(0, 8, 0);
+      } else if (type === "top") {
+        // Orthogonal top-down view to inspect bed margins and text alignment
+        camera.position.set(0, 230, 0);
         controls.target.set(0, 0, 0);
-      } else if (type === 'iso') {
-        camera.position.set(80, 75, 95);
-        controls.target.set(0, 5, 0);
+      } else if (type === "iso") {
+        // Isometric perspective matching OpenSCAD isometric.png (front-left elevation)
+        camera.position.set(-110, 95, 165);
+        controls.target.set(0, 8, 0);
       }
       controls.update();
     }
-    setView('iso');
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialView = urlParams.get("view") || "iso";
+    setView(initialView);
 
     function updateParam(name) {
-      const val = document.getElementById().value;
-      const unit = (name.includes('deg')) ? '°' : (name.includes('slices') ? '' : ' mm');
-      document.getElementById().textContent = val + unit;
+      const inputEl = document.getElementById("input-" + name);
+      if (!inputEl) return;
+      const val = inputEl.value;
+      const unit = (name.includes("deg")) ? "°" : (name.includes("slices") ? "" : " mm");
+      const valEl = document.getElementById("val-" + name);
+      if (valEl) valEl.textContent = val + unit;
       updateModel();
     }
 
     function autoFit() {
-      const name = document.getElementById('input-name').value || 'NAME';
+      const name = document.getElementById("input-name").value || "NAME";
       const maxL = 172;
       const margin = 3.5;
       const availableL = maxL - 2 * (margin + 3);
@@ -590,28 +600,28 @@
       const fittedNameSize = Math.min(22, Math.max(10, Math.floor((availableL / (nameLenChars * 0.82)) * 10) / 10));
       const fittedDesigSize = Math.min(14, Math.max(7, Math.floor(fittedNameSize * 0.68 * 10) / 10));
       
-      document.getElementById('input-name-size').value = fittedNameSize;
-      document.getElementById('val-name-size').textContent = fittedNameSize + ' mm';
-      document.getElementById('input-desig-size').value = fittedDesigSize;
-      document.getElementById('val-desig-size').textContent = fittedDesigSize + ' mm';
+      document.getElementById("input-name-size").value = fittedNameSize;
+      document.getElementById("val-name-size").textContent = fittedNameSize + " mm";
+      document.getElementById("input-desig-size").value = fittedDesigSize;
+      document.getElementById("val-desig-size").textContent = fittedDesigSize + " mm";
       
       updateModel();
     }
 
     let matBase, matName, matDesig;
     function updateColors() {
-      const cBase = document.getElementById('input-base-color').value;
-      const cText = document.getElementById('input-text-color').value;
-      const mode = document.getElementById('input-print-mode').value;
+      const cBase = document.getElementById("input-base-color").value;
+      const cText = document.getElementById("input-text-color").value;
+      const mode = document.getElementById("input-print-mode").value;
 
       if (!matBase) {
-        matBase = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.1 });
-        matName = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.1 });
-        matDesig = new THREE.MeshStandardMaterial({ roughness: 0.4, metalness: 0.1 });
+        matBase = new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.1 });
+        matName = new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.1 });
+        matDesig = new THREE.MeshStandardMaterial({ roughness: 0.35, metalness: 0.1 });
       }
 
       matBase.color.set(cBase);
-      if (mode === 'layer_pause') {
+      if (mode === "layer_pause") {
         matName.color.set(cText);
         matDesig.color.set(cText);
       } else {
@@ -628,98 +638,135 @@
         plateGroup.remove(plateGroup.children[0]);
       }
 
-      const nameStr = document.getElementById('input-name').value || ' ';
-      const desigStr = document.getElementById('input-desig').value || ' ';
-      const nameSize = parseFloat(document.getElementById('input-name-size').value);
-      const desigSize = parseFloat(document.getElementById('input-desig-size').value);
-      const bendDeg = parseFloat(document.getElementById('input-bend-deg').value);
-      const slices = parseInt(document.getElementById('input-slices').value);
-      const sliceT = parseFloat(document.getElementById('input-slice-t').value);
-      const slantName = document.getElementById('input-slant-name').checked;
-      const printMode = document.getElementById('input-print-mode').value;
-      const isDiagonal = document.getElementById('input-diagonal').checked;
+      const nameStr = document.getElementById("input-name").value || " ";
+      const desigStr = document.getElementById("input-desig").value || " ";
+      const nameSize = parseFloat(document.getElementById("input-name-size").value);
+      const desigSize = parseFloat(document.getElementById("input-desig-size").value);
+      const bendDeg = parseFloat(document.getElementById("input-bend-deg").value);
+      const slices = parseInt(document.getElementById("input-slices").value);
+      const sliceT = parseFloat(document.getElementById("input-slice-t").value);
+      const slantName = document.getElementById("input-slant-name").checked;
+      const printMode = document.getElementById("input-print-mode").value;
+      const isDiagonal = document.getElementById("input-diagonal").checked;
 
       const baseT = 3.0;
       const margin = 3.5;
       const lineGap = 4.5;
+      const bendRad = bendDeg * Math.PI / 180;
 
+      // 2D Text shapes
       const nameShapes = loadedFont.generateShapes(nameStr, nameSize);
       const desigShapes = loadedFont.generateShapes(desigStr, desigSize);
 
+      // Measure bounding boxes
       const nameGeoTest = new THREE.ShapeGeometry(nameShapes);
       nameGeoTest.computeBoundingBox();
-      const nameW = nameGeoTest.boundingBox ? (nameGeoTest.boundingBox.max.x - nameGeoTest.boundingBox.min.x) : 80;
+      const nb = nameGeoTest.boundingBox;
+      const nameW = nb ? (nb.max.x - nb.min.x) : 80;
+      const nameMidX = nb ? (nb.min.x + nb.max.x) / 2 : nameW / 2;
+      const nameDescender = 0.30 * nameSize;
 
       const desigGeoTest = new THREE.ShapeGeometry(desigShapes);
       desigGeoTest.computeBoundingBox();
-      const desigW = desigGeoTest.boundingBox ? (desigGeoTest.boundingBox.max.x - desigGeoTest.boundingBox.min.x) : 60;
+      const db = desigGeoTest.boundingBox;
+      const desigW = db ? (db.max.x - db.min.x) : 60;
+      const desigMidX = db ? (db.min.x + db.max.x) / 2 : desigW / 2;
+      const desigDescender = 0.30 * desigSize;
+
+      // Positions in OpenSCAD coordinates (Y goes from front to back):
+      const desigHingeY = -desigDescender;
+      const nameHingeY = desigSize + lineGap - nameDescender;
+
+      const plateMinY = desigHingeY - margin - 3.0;
+      const plateMaxY = (desigSize + lineGap + nameSize) + margin + 3.0;
+      const totalPlateW = plateMaxY - plateMinY;
+      const plateCenterY = (plateMinY + plateMaxY) / 2;
 
       const totalTextW = Math.max(nameW, desigW);
-      const totalPlateL = totalTextW + 2 * (margin + 3);
-      const totalPlateW = (nameSize + desigSize + lineGap) + 2 * (margin + 3);
+      const totalPlateL = totalTextW + 2 * (margin + 3.0);
+
+      // In Three.js:
+      // +Z is FRONT (facing viewer, smaller Y in OpenSCAD)
+      // -Z is BACK (away from viewer, larger Y in OpenSCAD)
+      const desigHingeZ = plateCenterY - desigHingeY;
+      const nameHingeZ = plateCenterY - nameHingeY;
+
+      // 1. BASE PLATE
+      const hw = totalPlateL / 2;
+      const hz = totalPlateW / 2;
+      const cr = 5.0;
 
       const baseShape = new THREE.Shape();
-      const hw = totalPlateL / 2;
-      const hh = totalPlateW / 2;
-      const cr = 4.0;
+      baseShape.moveTo(-hw + cr, -hz);
+      baseShape.lineTo(hw - cr, -hz);
+      baseShape.quadraticCurveTo(hw, -hz, hw, -hz + cr);
+      baseShape.lineTo(hw, hz - cr);
+      baseShape.quadraticCurveTo(hw, hz, hw - cr, hz);
+      baseShape.lineTo(-hw + cr, hz);
+      baseShape.quadraticCurveTo(-hw, hz, -hw, hz - cr);
+      baseShape.lineTo(-hw, -hz + cr);
+      baseShape.quadraticCurveTo(-hw, -hz, -hw + cr, -hz);
 
-      baseShape.moveTo(-hw + cr, -hh);
-      baseShape.lineTo(hw - cr, -hh);
-      baseShape.quadraticCurveTo(hw, -hh, hw, -hh + cr);
-      baseShape.lineTo(hw, hh - cr);
-      baseShape.quadraticCurveTo(hw, hh, hw - cr, hh);
-      baseShape.lineTo(-hw + cr, hh);
-      baseShape.quadraticCurveTo(-hw, hh, -hw, hh - cr);
-      baseShape.lineTo(-hw, -hh + cr);
-      baseShape.quadraticCurveTo(-hw, -hh, -hw + cr, -hh);
-
-      const baseExtrudeSettings = { depth: baseT, bevelEnabled: true, bevelThickness: 0.4, bevelSize: 0.4, bevelSegments: 3 };
-      const basePlateGeo = new THREE.ExtrudeGeometry(baseShape, baseExtrudeSettings);
+      const basePlateGeo = new THREE.ExtrudeGeometry(baseShape, {
+        depth: baseT,
+        bevelEnabled: true,
+        bevelThickness: 0.5,
+        bevelSize: 0.5,
+        bevelSegments: 3
+      });
       basePlateGeo.rotateX(-Math.PI / 2);
-      basePlateGeo.translate(0, baseT, 0);
-
       const baseMesh = new THREE.Mesh(basePlateGeo, matBase);
       baseMesh.castShadow = true;
       baseMesh.receiveShadow = true;
+      baseMesh.position.set(0, 0, 0);
       plateGroup.add(baseMesh);
 
-      const nameGroup = new THREE.Group();
-      const nameZPos = -hh + margin + desigSize + lineGap + (nameSize * 0.3);
-      const nameXOffset = -nameW / 2;
-
-      if (slantName) {
-        for (let i = 0; i < slices; i++) {
-          const ang = (i * (bendDeg / slices)) * Math.PI / 180;
-          const sliceGeo = new THREE.ExtrudeGeometry(nameShapes, { depth: sliceT, bevelEnabled: false });
-          sliceGeo.rotateX(-ang);
-          const sliceMesh = new THREE.Mesh(sliceGeo, matName);
-          sliceMesh.position.set(nameXOffset, baseT + (i * 0.02), nameZPos - (Math.sin(ang) * (nameSize * 0.5)));
-          nameGroup.add(sliceMesh);
-        }
-      } else {
-        const solidNameGeo = new THREE.ExtrudeGeometry(nameShapes, { depth: 8.0, bevelEnabled: false });
-        solidNameGeo.rotateX(-Math.PI / 2);
-        const nameMesh = new THREE.Mesh(solidNameGeo, matName);
-        nameMesh.position.set(nameXOffset, baseT, nameZPos);
-        nameGroup.add(nameMesh);
-      }
-      plateGroup.add(nameGroup);
-
+      // 2. DESIGNATION TEXT (FRONT ROW - WHITE)
       const desigGroup = new THREE.Group();
-      const desigZPos = -hh + margin + (desigSize * 0.35);
-      const desigXOffset = -desigW / 2;
-
       for (let i = 0; i < slices; i++) {
-        const ang = (i * (bendDeg / slices)) * Math.PI / 180;
+        const theta = i * (bendRad / slices);
         const sliceGeo = new THREE.ExtrudeGeometry(desigShapes, { depth: sliceT, bevelEnabled: false });
-        sliceGeo.rotateX(-ang);
+        sliceGeo.translate(-desigMidX, desigDescender, 0);
+        sliceGeo.rotateX(-Math.PI / 2);
+        sliceGeo.rotateX(theta);
         const sliceMesh = new THREE.Mesh(sliceGeo, matDesig);
-        sliceMesh.position.set(desigXOffset, baseT + (i * 0.02), desigZPos - (Math.sin(ang) * (desigSize * 0.45)));
+        sliceMesh.castShadow = true;
+        sliceMesh.receiveShadow = true;
+        sliceMesh.position.set(0, baseT, desigHingeZ);
         desigGroup.add(sliceMesh);
       }
       plateGroup.add(desigGroup);
 
-      if (printMode === 'inlay_assembly') {
+      // 3. NAME TEXT (BACK ROW - ORANGE)
+      const nameGroup = new THREE.Group();
+      if (slantName) {
+        for (let i = 0; i < slices; i++) {
+          const theta = i * (bendRad / slices);
+          const sliceGeo = new THREE.ExtrudeGeometry(nameShapes, { depth: sliceT, bevelEnabled: false });
+          sliceGeo.translate(-nameMidX, nameDescender, 0);
+          sliceGeo.rotateX(-Math.PI / 2);
+          sliceGeo.rotateX(theta);
+          const sliceMesh = new THREE.Mesh(sliceGeo, matName);
+          sliceMesh.castShadow = true;
+          sliceMesh.receiveShadow = true;
+          sliceMesh.position.set(0, baseT, nameHingeZ);
+          nameGroup.add(sliceMesh);
+        }
+      } else {
+        const nameH = 8.0;
+        const solidNameGeo = new THREE.ExtrudeGeometry(nameShapes, { depth: nameH, bevelEnabled: false });
+        solidNameGeo.translate(-nameMidX, nameDescender, 0);
+        solidNameGeo.rotateX(-Math.PI / 2);
+        const nameMesh = new THREE.Mesh(solidNameGeo, matName);
+        nameMesh.castShadow = true;
+        nameMesh.receiveShadow = true;
+        nameMesh.position.set(0, baseT, nameHingeZ);
+        nameGroup.add(nameMesh);
+      }
+      plateGroup.add(nameGroup);
+
+      // 4. INLAY TAB (FOR INLAY ASSEMBLY MODE)
+      if (printMode === "inlay_assembly") {
         const tabShape = new THREE.Shape();
         const tabW = desigW + 4;
         const tabH = desigSize + 4;
@@ -732,7 +779,7 @@
         const tabGeo = new THREE.ExtrudeGeometry(tabShape, { depth: 1.0, bevelEnabled: false });
         tabGeo.rotateX(-Math.PI / 2);
         const tabMesh = new THREE.Mesh(tabGeo, matDesig);
-        tabMesh.position.set(0, baseT - 1.0, desigZPos + desigSize/2);
+        tabMesh.position.set(0, baseT - 1.0, desigHingeZ - (desigSize / 2));
         plateGroup.add(tabMesh);
       }
 
@@ -742,24 +789,24 @@
         plateGroup.rotation.y = 0;
       }
 
-      const totalH = baseT + (nameSize * Math.sin(bendDeg * Math.PI / 180)) + 2.0;
-      document.getElementById('dim-readout').textContent = 
-        Math.round(totalPlateL) + ' × ' + Math.round(totalPlateW) + ' × ' + Math.round(totalH) + ' mm';
+      const totalH = baseT + (Math.max(nameSize, desigSize) * Math.sin(bendRad)) + sliceT;
+      document.getElementById("dim-readout").textContent = 
+        Math.round(totalPlateL) + " × " + Math.round(totalPlateW) + " × " + Math.round(totalH) + " mm";
 
-      const pill = document.getElementById('bed-status-pill');
+      const pill = document.getElementById("bed-status-pill");
       if (totalPlateL <= 175) {
-        pill.className = 'status-pill status-ok';
-        pill.textContent = '● Fits on A1 Mini Bed (180x180)';
+        pill.className = "status-pill status-ok";
+        pill.textContent = "● Fits on A1 Mini Bed (180x180)";
       } else if (totalPlateL <= 245) {
-        pill.className = 'status-pill status-diag';
-        pill.textContent = isDiagonal ? '● Fits on A1 Mini Bed Diagonally' : '⚠️ Exceeds 175mm (Turn on Diagonal)';
+        pill.className = "status-pill status-diag";
+        pill.textContent = isDiagonal ? "● Fits on A1 Mini Bed Diagonally" : "⚠️ Exceeds 175mm (Turn on Diagonal)";
       } else {
-        pill.className = 'status-pill status-warn';
-        pill.textContent = '❌ Too Long! Click Auto-Fit';
+        pill.className = "status-pill status-warn";
+        pill.textContent = "❌ Too Long! Click Auto-Fit";
       }
 
-      document.getElementById('overhang-readout').textContent = 
-        bendDeg + '° from vertical (' + (90 - bendDeg) + '° from desk, 100% support-free)';
+      document.getElementById("overhang-readout").textContent = 
+        bendDeg + "° from vertical (" + (90 - bendDeg) + "° from desk, 100% support-free)";
     }
 
     function openGuide() { document.getElementById('guide-modal').style.display = 'flex'; }
@@ -817,13 +864,19 @@
         alert('STL Exporter library is loading. Please try again in a moment.');
         return;
       }
+      // Ensure world matrix update and orient Z as UP for standard 3D printing
+      const exportGroup = plateGroup.clone(true);
+      exportGroup.rotation.x = Math.PI / 2;
+      exportGroup.updateMatrixWorld(true);
+
       const exporter = new THREE.STLExporter();
-      const result = exporter.parse(plateGroup, { binary: true });
+      const result = exporter.parse(exportGroup, { binary: true });
       const blob = new Blob([result], { type: 'application/octet-stream' });
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
+      const name = document.getElementById('input-name').value || 'nameplate';
       const mode = document.getElementById('input-print-mode').value;
-      a.download = 'nameplate_' + name.replace(/\\s+/g, '_') + '_' + mode + '.stl';
+      a.download = 'nameplate_' + name.replace(/\s+/g, '_') + '_' + mode + '.stl';
       a.click();
     }
 
